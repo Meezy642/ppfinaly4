@@ -51,6 +51,7 @@
                             <td class="px-6 py-5 border-b border-zinc-800/60 align-middle">
                                 <div class="flex items-center bg-zinc-950/40 border border-zinc-800 rounded-xl p-1 w-fit">
                                     <form action="{{ url_for('decrease_cart', item_id=item.product.id) }}" method="POST" class="inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-900 border border-zinc-800 hover:bg-purple-650 hover:text-white transition-colors cursor-pointer text-slate-300" title="Decrease Quantity">
                                             <i class="fas fa-minus text-[10px]"></i>
                                         </button>
@@ -59,6 +60,7 @@
                                     <input type="text" value="{{ item.quantity }}" readonly class="w-8 text-center bg-transparent border-0 text-white font-bold text-sm focus:outline-none focus:ring-0">
 
                                     <form action="{{ url_for('increase_cart', item_id=item.product.id) }}" method="POST" class="inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-900 border border-zinc-800 hover:bg-purple-650 hover:text-white transition-colors cursor-pointer text-slate-300" title="Increase Quantity">
                                             <i class="fas fa-plus text-[10px]"></i>
                                         </button>
@@ -74,6 +76,7 @@
                             <!-- Remove Button Cell -->
                             <td class="px-6 py-5 border-b border-zinc-800/60 align-middle text-right">
                                 <form action="{{ url_for('remove_from_cart', item_id=item.product.id) }}" method="POST" class="m-0 inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit" 
                                             class="text-slate-400 hover:text-purple-400 transition-colors p-2 cursor-pointer" 
                                             title="Remove Item"

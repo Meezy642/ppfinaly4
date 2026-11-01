@@ -99,19 +99,21 @@
                 <!-- Product Image Window -->
                 <div class="relative bg-zinc-950/20 aspect-square overflow-hidden w-full p-6 flex items-center justify-center border-b border-zinc-800/60">
                     <a href="{{ url_for('view_product', item_id=itm.id) }}" class="block w-full h-full flex items-center justify-center">
-                        <img src="{{ itm.image }}" alt="{{ itm.title }}" class="max-w-full max-h-40 object-contain transform group-hover:scale-105 transition-transform duration-500 ease-in-out mix-blend-screen">
+                        <img src="{{ itm.image }}" alt="{{ itm.title }}" class="max-w-full max-h-40 object-contain transform group-hover:scale-105 transition-transform duration-500 ease-in-out mix-blend-screen" onerror="this.onerror=null; this.src='/static/uploads/fakestore/product_{{ itm.id }}.jpg';">
                     </a>
 
                     <!-- Favorite Button Overlay -->
                     <div class="absolute top-4 right-4 z-10">
                         {% if itm.id in wishlist %}
                         <form action="{{ url_for('remove_from_wishlist', item_id=itm.id) }}" method="POST" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="w-8 h-8 rounded-full bg-zinc-900/80 hover:bg-purple-950/80 text-purple-500 border border-zinc-800 flex items-center justify-center transition-all shadow-md cursor-pointer hover:scale-110" title="Remove from Wishlist">
                                 <i class="fas fa-heart text-xs"></i>
                             </button>
                         </form>
                         {% else %}
                         <form action="{{ url_for('add_to_wishlist', item_id=itm.id) }}" method="POST" class="m-0">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="w-8 h-8 rounded-full bg-zinc-900/80 hover:bg-purple-950/80 text-slate-400 hover:text-purple-500 border border-zinc-800 flex items-center justify-center transition-all shadow-md cursor-pointer hover:scale-110" title="Add to Wishlist">
                                 <i class="far fa-heart text-xs"></i>
                             </button>
@@ -137,6 +139,7 @@
                 <!-- Action Button Footer -->
                 <div class="p-4 pt-0 mt-auto">
                     <form action="{{ url_for('add_to_cart', item_id=itm.id) }}" method="POST" class="w-full m-0">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="w-full inline-flex justify-center items-center py-2.5 rounded-xl btn-primary text-white border border-purple-500/20 transition-all duration-200 text-sm font-bold font-heading gap-2 cursor-pointer shadow-sm" title="Add to Cart">
                             Add to Cart <i class="fas fa-shopping-cart text-xs"></i>
                         </button>

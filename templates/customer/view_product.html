@@ -22,12 +22,72 @@
 
     <!-- Main Detail Row Split -->
     <div class="flex flex-col lg:flex-row gap-10 xl:gap-16">
-        <!-- Product Image -->
-        <div class="w-full lg:w-1/2">
-            <div class="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-8 sm:p-12 flex items-center justify-center min-h-[300px] sm:min-h-[450px] shadow-lg relative group overflow-hidden hover:border-purple-500/40 transition-colors duration-300">
+                <!-- Product Image & Gallery Switcher -->
+        <div class="w-full lg:w-1/2 flex flex-col items-center">
+            <div class="w-full bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-8 sm:p-12 flex items-center justify-center min-h-[300px] sm:min-h-[450px] shadow-lg relative group overflow-hidden hover:border-purple-500/40 transition-colors duration-300">
                 <div class="bg-white p-6 rounded-xl flex items-center justify-center w-full h-full max-w-[320px] max-h-[320px] sm:max-w-[400px] sm:max-h-[400px] shadow-inner">
-                    <img src="{{ item.image }}" alt="{{ item.title }}" class="max-w-full h-auto max-h-[260px] sm:max-h-[300px] object-contain transform group-hover:scale-105 transition-transform duration-500 ease-out mix-blend-multiply">
+                    <img id="main-product-image" 
+                         src="{{ item.image }}" 
+                         alt="{{ item.title }}" 
+                         class="max-w-full h-auto max-h-[260px] sm:max-h-[320px] object-contain transform group-hover:scale-105 transition-all duration-300 ease-out" 
+                         onerror="this.onerror=null; this.src='/static/uploads/fakestore/product_{{ item.id }}.jpg';">
                 </div>
+            </div>
+
+                        <!-- Thumbnail Gallery Switcher (Switch Image) -->
+            {% set display_gallery = [] %}
+            {% if gallery_images is defined and gallery_images %}
+                {% for g_u in gallery_images %}
+                    {% if g_u and g_u not in display_gallery %}
+                        {% set _ = display_gallery.append(g_u) %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+            {% if not display_gallery and item.images %}
+                {% for g_img in item.images %}
+                    {% set g_url = g_img.image_url if g_img.image_url is defined else (g_img.name if g_img.name is defined else g_img) %}
+                    {% if g_url and g_url not in display_gallery %}
+                        {% set _ = display_gallery.append(g_url) %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+            {% if not display_gallery %}
+                {% set base_img = item.image or item.thumbnail or ('/static/uploads/fakestore/product_' ~ item.id ~ '.jpg') %}
+                {% set _ = display_gallery.append(base_img) %}
+            {% endif %}
+
+            {% set fallback_angles = [
+                '/static/uploads/fakestore/product_' ~ item.id ~ '.jpg',
+                '/static/uploads/gallery/product_' ~ item.id ~ '_angle_2.jpg',
+                '/static/uploads/gallery/product_' ~ item.id ~ '_angle_3.jpg',
+                '/static/uploads/gallery/product_' ~ item.id ~ '_angle_4.jpg'
+            ] %}
+            {% for fa in fallback_angles %}
+                {% if display_gallery|length < 4 and fa not in display_gallery %}
+                    {% set _ = display_gallery.append(fa) %}
+                {% endif %}
+            {% endfor %}
+            {% if display_gallery|length < 4 %}
+                {% set base_img = display_gallery[0] %}
+                {% for _ in range(4 - display_gallery|length) %}
+                    {% set _ = display_gallery.append(base_img) %}
+                {% endfor %}
+            {% endif %}
+
+            <div class="w-full mt-6 flex items-center justify-center sm:justify-start gap-3 sm:gap-4 overflow-x-auto py-2 px-1">
+                {% for img_url in display_gallery[:4] %}
+                <button type="button"
+                        onclick="switchProductImage('{{ img_url }}', this)"
+                        class="product-thumb-btn group relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl p-1.5 transition-all duration-200 cursor-pointer flex-shrink-0 flex items-center justify-center bg-white border-2 shadow-sm {{ 'border-purple-600 ring-2 ring-purple-500/60 shadow-purple-500/25 active-thumb' if loop.first else 'border-slate-200/90 dark:border-zinc-800 hover:border-purple-400 opacity-75 hover:opacity-100 hover:scale-105' }}"
+                        title="View angle {{ loop.index }}">
+                    <img src="{{ img_url }}" 
+                         alt="Thumbnail {{ loop.index }}" 
+                         class="w-full h-full object-contain rounded-xl"
+                         onerror="this.onerror=null; this.src='/static/uploads/fakestore/product_{{ item.id }}.jpg';">
+                </button>
+                {% endfor %}
             </div>
         </div>
 
@@ -61,6 +121,7 @@
             <!-- Actions -->
             <div class="flex flex-col sm:flex-row items-center gap-4 mt-auto">
                 <form action="{{ url_for('add_to_cart', item_id=item.id) }}" method="POST" class="w-full sm:w-auto flex-1">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="w-full flex items-center justify-center gap-3 btn-primary text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 shadow-md transform hover:-translate-y-0.5 cursor-pointer">
                         <i class="fas fa-shopping-cart"></i> Add to Shopping Cart
                     </button>
@@ -69,12 +130,14 @@
                 <!-- Dynamic Wishlist Action Toggles -->
                 {% if in_wishlist %}
                 <form action="{{ url_for('remove_from_wishlist', item_id=item.id) }}" method="POST" class="w-full sm:w-auto flex-shrink-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="w-full sm:w-auto flex-shrink-0 flex items-center justify-center bg-purple-950/20 border border-purple-800 text-purple-400 hover:bg-purple-900/30 py-4 px-4 sm:w-14 sm:h-14 sm:py-0 rounded-xl transition-all duration-300 shadow-sm cursor-pointer" title="Remove from Wishlist">
                         <i class="fas fa-heart text-xl text-purple-500 mr-2 sm:mr-0"></i> <span class="sm:hidden font-semibold">Remove Favorite</span>
                     </button>
                 </form>
                 {% else %}
                 <form action="{{ url_for('add_to_wishlist', item_id=item.id) }}" method="POST" class="w-full sm:w-auto flex-shrink-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="w-full sm:w-auto flex-shrink-0 flex items-center justify-center bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 hover:bg-purple-950/20 hover:text-purple-400 text-slate-400 py-4 px-4 sm:w-14 sm:h-14 sm:py-0 rounded-xl transition-all duration-300 shadow-sm cursor-pointer" title="Add to Wishlist">
                         <i class="far fa-heart text-xl mr-2 sm:mr-0"></i> <span class="sm:hidden font-semibold">Add to Favorites</span>
                     </button>
@@ -118,4 +181,31 @@
     {% endif %}
 
 </div>
+
+<script>
+function switchProductImage(imgSrc, btnElement) {
+    const mainImg = document.getElementById('main-product-image');
+    if (!mainImg) return;
+
+    // Smooth transition effect
+    mainImg.style.opacity = '0.2';
+    mainImg.style.transform = 'scale(0.95)';
+
+    setTimeout(() => {
+        mainImg.src = imgSrc;
+        mainImg.style.opacity = '1';
+        mainImg.style.transform = 'scale(1)';
+    }, 120);
+
+    // Toggle active classes on thumbnails
+    document.querySelectorAll('.product-thumb-btn').forEach(btn => {
+        btn.classList.remove('border-purple-600', 'ring-2', 'ring-purple-500/60', 'shadow-purple-500/25', 'border-indigo-600', 'ring-indigo-500/50', 'shadow-indigo-500/20', 'active-thumb');
+        btn.classList.add('border-slate-200/90', 'dark:border-zinc-800', 'opacity-75');
+    });
+
+    btnElement.classList.remove('border-slate-200/90', 'dark:border-zinc-800', 'opacity-75');
+    btnElement.classList.add('border-purple-600', 'ring-2', 'ring-purple-500/60', 'shadow-purple-500/25', 'opacity-100', 'active-thumb');
+}
+</script>
+
 {% endblock %}

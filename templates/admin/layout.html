@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Admin Panel{% endblock %} | YSTAA SHOPP</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="referrer" content="no-referrer">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,6 +15,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <!-- Admin CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <!-- Early theme detector -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('admin_theme') || 'dark';
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark-mode');
+            }
+        })();
+    </script>
 </head>
 <body>
     <!-- Sidebar -->
@@ -65,6 +76,12 @@
                                 <span>Categories</span>
                             </a>
                         </li>
+                        <li>
+                            <a href="/api/products" target="_blank">
+                                <i class="fas fa-code dot-icon"></i>
+                                <span>Products API</span>
+                            </a>
+                        </li>
                     </ul>
                 </li>
                 <li class="sidebar-menu-item {% if request.endpoint == 'admin_orders' %}active{% endif %}">
@@ -111,8 +128,8 @@
                 <div class="topbar-icon" title="Fullscreen" id="fullscreen-btn">
                     <i class="fas fa-expand-arrows-alt"></i>
                 </div>
-                <div class="topbar-icon" title="Theme">
-                    <i class="far fa-sun"></i>
+                <div class="topbar-icon" title="Toggle Theme" id="admin-theme-btn" style="cursor: pointer;">
+                    <i class="far fa-sun" id="admin-theme-icon"></i>
                 </div>
                 <div class="topbar-user-menu" id="user-menu-toggle">
                     {% if logged_in_user_pic and 'no-profile' not in logged_in_user_pic %}
@@ -252,6 +269,53 @@
                 mainWrapper.classList.add('expanded');
             }
         });
+
+        // Auto-inject CSRF token into all POST forms
+        document.addEventListener('DOMContentLoaded', () => {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            if (csrfToken) {
+                document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(form => {
+                    if (!form.querySelector('input[name="csrf_token"]')) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'csrf_token';
+                        input.value = csrfToken;
+                        form.appendChild(input);
+                    }
+                });
+            }
+        });
+            // Admin Theme toggle logic
+        const adminThemeBtn = document.getElementById('admin-theme-btn');
+        const adminThemeIcon = document.getElementById('admin-theme-icon');
+
+        function updateAdminThemeUI(isDark) {
+            if (isDark) {
+                document.documentElement.classList.add('dark-mode');
+                if (document.body) document.body.classList.add('dark-mode');
+                if (adminThemeIcon) {
+                    adminThemeIcon.className = 'far fa-sun';
+                }
+            } else {
+                document.documentElement.classList.remove('dark-mode');
+                if (document.body) document.body.classList.remove('dark-mode');
+                if (adminThemeIcon) {
+                    adminThemeIcon.className = 'fas fa-moon';
+                }
+            }
+        }
+
+        const isDarkInit = (localStorage.getItem('admin_theme') || 'dark') === 'dark';
+        updateAdminThemeUI(isDarkInit);
+
+        if (adminThemeBtn) {
+            adminThemeBtn.addEventListener('click', () => {
+                const currentlyDark = document.body.classList.contains('dark-mode') || document.documentElement.classList.contains('dark-mode');
+                const newDark = !currentlyDark;
+                localStorage.setItem('admin_theme', newDark ? 'dark' : 'light');
+                updateAdminThemeUI(newDark);
+            });
+        }
     </script>
     {% block scripts %}{% endblock %}
 </body>

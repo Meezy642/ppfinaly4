@@ -32,7 +32,7 @@
                {{ 'bg-zinc-800/60 text-purple-400' if request.endpoint == 'about' else 'text-slate-400 hover:bg-zinc-900 hover:text-white' }}">
                 About Us
             </a>
-            {% if logged_in_user_role == 'admin' %}
+            {% if logged_in_user_role in ['admin', 'staff', 'Super Administrator'] or session.get('user_role') in ['admin', 'staff', 'Super Administrator'] %}
             <a href="{{ url_for('admin_dashboard') }}"
                class="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200
                {{ 'bg-indigo-900/60 text-indigo-400' if request.endpoint.startswith('admin') else 'text-indigo-400 hover:bg-indigo-950/40 hover:text-indigo-300' }}">
@@ -45,9 +45,8 @@
         <div class="flex items-center gap-2 sm:gap-4">
 
             <!-- Theme Toggle Mode Button -->
-            <button id="theme-toggle" type="button" class="p-2 rounded-lg transition-colors text-slate-400 hover:bg-zinc-900 hover:text-white cursor-pointer" title="Toggle Theme">
-                <i class="fas fa-sun text-lg" id="theme-toggle-sun-icon"></i>
-                <i class="fas fa-moon text-lg hidden" id="theme-toggle-moon-icon"></i>
+            <button id="theme-toggle" type="button" onclick="toggleTheme()" class="p-2 rounded-lg transition-colors text-slate-400 hover:bg-zinc-900 hover:text-white cursor-pointer" title="Toggle Theme">
+                <i class="fas fa-sun text-lg text-amber-400" id="theme-toggle-icon"></i>
             </button>
 
             <!-- Favorites Action Link -->
@@ -115,7 +114,7 @@
             <a href="{{ url_for('products') }}" class="block px-3 py-2 rounded-md text-base font-semibold {{ 'bg-zinc-900 text-purple-400' if request.endpoint == 'products' else 'text-slate-300 hover:text-white hover:bg-zinc-900' }}">Product</a>
             <a href="{{ url_for('contact') }}" class="block px-3 py-2 rounded-md text-base font-semibold {{ 'bg-zinc-900 text-purple-400' if request.endpoint == 'contact' else 'text-slate-300 hover:text-white hover:bg-zinc-900' }}">Contact Us</a>
             <a href="{{ url_for('about') }}" class="block px-3 py-2 rounded-md text-base font-semibold {{ 'bg-zinc-900 text-purple-400' if request.endpoint == 'about' else 'text-slate-300 hover:text-white hover:bg-zinc-900' }}">About Us</a>
-            {% if logged_in_user_role == 'admin' %}
+            {% if logged_in_user_role in ['admin', 'staff', 'Super Administrator'] or session.get('user_role') in ['admin', 'staff', 'Super Administrator'] %}
             <a href="{{ url_for('admin_dashboard') }}" class="block px-3 py-2 rounded-md text-base font-semibold bg-indigo-950/20 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-950/30"><i class="fas fa-user-shield mr-1"></i> Admin Panel</a>
             {% endif %}
             {% if logged_in_user %}
@@ -125,6 +124,10 @@
             {% else %}
             <a href="{{ url_for('login') }}" class="block px-3 py-2 rounded-md text-base font-semibold text-slate-300 hover:text-white hover:bg-zinc-900 border-t border-zinc-800 mt-2 pt-2">Login / Register</a>
             {% endif %}
+            <button type="button" onclick="const b = document.getElementById('theme-toggle'); if(b) b.click();" class="w-full flex items-center justify-between px-3 py-2 rounded-md text-base font-semibold text-slate-300 hover:text-white hover:bg-zinc-900 border-t border-zinc-800 mt-2 pt-2 cursor-pointer">
+                <span>Toggle Theme Mode</span>
+                <i class="fas fa-adjust text-purple-400"></i>
+            </button>
         </div>
     </div>
 </header>

@@ -10,8 +10,22 @@
             <p>Join YSTAA SHOPP to save favorites and place orders</p>
         </div>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages" style="margin-bottom: 1rem;">
+                {% for category, message in messages %}
+                <div style="padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 0.5rem; {{ 'background-color: rgba(220, 38, 38, 0.2); border: 1px solid #ef4444; color: #fca5a5;' if category in ['error', 'danger'] else 'background-color: rgba(22, 163, 74, 0.2); border: 1px solid #22c55e; color: #86efac;' }}">
+                    <i class="fas {{ 'fa-exclamation-circle' if category in ['error', 'danger'] else 'fa-check-circle' }}" style="margin-right: 0.5rem;"></i>
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
         <!-- Core Authentication Form -->
         <form action="{{ url_for('register') }}" method="POST" class="auth-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="form-group-field">
                 <label for="username">Username</label>

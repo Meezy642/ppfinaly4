@@ -4,16 +4,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YSTAA SHOPP - Premium E-Commerce</title>
-    <!-- Early theme detector to prevent screen flashing -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+            <!-- Early theme detector and toggle controller -->
     <script>
         (function() {
             const savedTheme = localStorage.getItem('theme') || 'dark';
             if (savedTheme === 'light') {
                 document.documentElement.classList.add('light-mode');
+                document.documentElement.classList.remove('dark');
             } else {
                 document.documentElement.classList.remove('light-mode');
+                document.documentElement.classList.add('dark');
             }
         })();
+
+        function applyTheme(theme) {
+            const isLight = theme === 'light';
+            const html = document.documentElement;
+            const body = document.body;
+            if (isLight) {
+                html.classList.add('light-mode');
+                html.classList.remove('dark');
+                if (body) {
+                    body.classList.add('light-mode');
+                    body.classList.remove('dark');
+                }
+            } else {
+                html.classList.remove('light-mode');
+                html.classList.add('dark');
+                if (body) {
+                    body.classList.remove('light-mode');
+                    body.classList.add('dark');
+                }
+            }
+            localStorage.setItem('theme', theme);
+            updateThemeIcons(theme);
+        }
+
+        function updateThemeIcons(theme) {
+            const icon = document.getElementById('theme-toggle-icon');
+            if (icon) {
+                if (theme === 'light') {
+                    icon.className = 'fas fa-moon text-lg text-amber-500';
+                } else {
+                    icon.className = 'fas fa-sun text-lg text-amber-400';
+                }
+            }
+        }
+
+        window.toggleTheme = function() {
+            const currentTheme = localStorage.getItem('theme') === 'light' ? 'light' : 'dark';
+            const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+            applyTheme(nextTheme);
+            if (typeof showToast === 'function') {
+                showToast(nextTheme === 'light' ? 'Switched to Light mode' : 'Switched to Dark mode', 'info');
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            applyTheme(savedTheme);
+        });
     </script>
     <!-- Tailwind CSS Script CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -21,9 +72,10 @@
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Premium Custom Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.1.4">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.1.5">
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
                     fontFamily: {
@@ -50,9 +102,10 @@
     <!-- Sleek Toast Notification System -->
     <div id="toast-container"></div>
 
-    <script>
+        <script>
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
+            if (!container) return;
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
             
@@ -79,7 +132,6 @@
             toast.appendChild(closeBtn);
             container.appendChild(toast);
             
-            // Auto dismiss toast after 4.5 seconds
             setTimeout(() => {
                 if (toast.parentNode) {
                     toast.classList.add('toast-fade-out');
@@ -99,61 +151,35 @@
             {% endwith %}
         });
 
-        // Theme toggle logic
-        document.addEventListener('DOMContentLoaded', () => {
-            const toggleButton = document.getElementById('theme-toggle');
-            const sunIcon = document.getElementById('theme-toggle-sun-icon');
-            const moonIcon = document.getElementById('theme-toggle-moon-icon');
-
-            function updateIcons() {
-                const isLight = document.documentElement.classList.contains('light-mode');
-                if (toggleButton) {
-                    if (isLight) {
-                        sunIcon.classList.add('hidden');
-                        moonIcon.classList.remove('hidden');
-                    } else {
-                        sunIcon.classList.remove('hidden');
-                        moonIcon.classList.add('hidden');
-                    }
-                }
-            }
-
-            if (toggleButton) {
-                updateIcons();
-                toggleButton.addEventListener('click', () => {
-                    const isLight = document.documentElement.classList.toggle('light-mode');
-                    localStorage.setItem('theme', isLight ? 'light' : 'dark');
-                    updateIcons();
-                    showToast(`Switched to ${isLight ? 'Light' : 'Dark'} mode`, 'info');
-                });
-            }
-        });
-
         // AJAX Wishlist & Cart Operations
         document.addEventListener('submit', function(e) {
             const form = e.target;
             const action = form.getAttribute('action') || '';
             
-            if (action.includes('add_to_wishlist') || action.includes('remove_from_wishlist')) {
+            if (action.includes('add_to_wishlist') || action.includes('add-to-wishlist') || action.includes('remove_from_wishlist') || action.includes('remove-from-wishlist')) {
                 e.preventDefault();
                 
-                const isAdding = action.includes('add_to_wishlist');
-                const itemId = action.split('/').pop();
+                const isAdding = action.includes('add_to_wishlist') || action.includes('add-to-wishlist');
+                const cleanAction = action.split('?')[0].replace(/\/+$/, '');
+                const itemId = cleanAction.split('/').pop();
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
                 
                 fetch(action, {
                     method: 'POST',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrfToken || ''
                     }
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) throw new Error('Wishlist network error');
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
-                        // Show dynamic success toast
-                        showToast(isAdding ? 'Added to favorites' : 'Removed from favorites', 'success');
+                        showToast(isAdding ? 'Added to favorites!' : 'Removed from favorites', 'success');
                         
                         if (window.location.pathname.includes('/favorites') || window.location.pathname.includes('/wishlist')) {
-                            // If we are on wishlist page, remove the card dynamically
                             const card = form.closest('.group');
                             if (card) {
                                 card.style.transition = 'all 0.3s ease';
@@ -168,84 +194,77 @@
                                 }, 300);
                             }
                         } else {
-                            // Find and update all wishlist forms for this specific item ID on current page
-                            const targetForms = document.querySelectorAll(`form[action*="add_to_wishlist/${itemId}"], form[action*="remove_from_wishlist/${itemId}"]`);
+                            const targetForms = document.querySelectorAll(`form[action*="add_to_wishlist/${itemId}"], form[action*="add-to-wishlist/${itemId}"], form[action*="remove_from_wishlist/${itemId}"], form[action*="remove-from-wishlist/${itemId}"]`);
                             
                             targetForms.forEach(f => {
                                 const btn = f.querySelector('button');
+                                if (!btn) return;
                                 const icon = btn.querySelector('i');
+                                const textSpan = btn.querySelector('span');
+                                const isDetailPage = btn.classList.contains('sm:h-14') || btn.classList.contains('py-4') || f.closest('.flex-col.lg\:flex-row') || f.closest('.mt-auto');
                                 
                                 if (isAdding) {
                                     f.setAttribute('action', `/remove_from_wishlist/${itemId}`);
                                     btn.setAttribute('title', 'Remove from Wishlist');
-                                    if (icon) {
-                                        icon.className = 'fas fa-heart text-xs text-purple-500';
-                                    }
-                                    btn.className = 'w-8 h-8 rounded-full bg-zinc-900/80 hover:bg-purple-950/80 text-purple-500 border border-zinc-800 flex items-center justify-center transition-all shadow-md cursor-pointer hover:scale-110';
-                                    
-                                    // Handle product detail page elements if they exist
-                                    if (btn.classList.contains('py-4') || btn.classList.contains('sm:h-14')) {
+                                    if (isDetailPage) {
                                         btn.className = 'w-full sm:w-auto flex-shrink-0 flex items-center justify-center bg-purple-950/20 border border-purple-800 text-purple-400 hover:bg-purple-900/30 py-4 px-4 sm:w-14 sm:h-14 sm:py-0 rounded-xl transition-all duration-300 shadow-sm cursor-pointer';
-                                        if (icon) {
-                                            icon.className = 'fas fa-heart text-xl text-purple-500';
-                                        }
+                                        if (icon) icon.className = 'fas fa-heart text-xl text-purple-500 mr-2 sm:mr-0';
+                                        if (textSpan) textSpan.textContent = 'Remove Favorite';
+                                    } else {
+                                        btn.className = 'w-8 h-8 rounded-full bg-zinc-900/80 hover:bg-purple-950/80 text-purple-500 border border-zinc-800 flex items-center justify-center transition-all shadow-md cursor-pointer hover:scale-110';
+                                        if (icon) icon.className = 'fas fa-heart text-xs text-purple-500';
                                     }
                                 } else {
                                     f.setAttribute('action', `/add_to_wishlist/${itemId}`);
                                     btn.setAttribute('title', 'Add to Wishlist');
-                                    if (icon) {
-                                        icon.className = 'far fa-heart text-xs text-slate-400';
-                                    }
-                                    btn.className = 'w-8 h-8 rounded-full bg-zinc-900/80 hover:bg-purple-950/80 text-slate-400 hover:text-purple-500 border border-zinc-800 flex items-center justify-center transition-all shadow-md cursor-pointer hover:scale-110';
-                                    
-                                    // Handle product detail page elements if they exist
-                                    if (btn.classList.contains('py-4') || btn.classList.contains('sm:h-14')) {
+                                    if (isDetailPage) {
                                         btn.className = 'w-full sm:w-auto flex-shrink-0 flex items-center justify-center bg-zinc-900 border border-zinc-800 hover:border-purple-500/50 hover:bg-purple-950/20 hover:text-purple-400 text-slate-400 py-4 px-4 sm:w-14 sm:h-14 sm:py-0 rounded-xl transition-all duration-300 shadow-sm cursor-pointer';
-                                        if (icon) {
-                                            icon.className = 'far fa-heart text-xl';
-                                        }
+                                        if (icon) icon.className = 'far fa-heart text-xl mr-2 sm:mr-0';
+                                        if (textSpan) textSpan.textContent = 'Add to Favorites';
+                                    } else {
+                                        btn.className = 'w-8 h-8 rounded-full bg-zinc-900/80 hover:bg-purple-950/80 text-slate-400 hover:text-purple-500 border border-zinc-800 flex items-center justify-center transition-all shadow-md cursor-pointer hover:scale-110';
+                                        if (icon) icon.className = 'far fa-heart text-xs text-slate-400';
                                     }
                                 }
                             });
                         }
                         
-                        // Update global header count badge
-                        const wishlistBadgeContainer = document.querySelector('a[href*="/favorites"]');
-                        if (wishlistBadgeContainer) {
-                            let badge = wishlistBadgeContainer.querySelector('.wishlist-badge');
+                        // Update all header badges across desktop & mobile
+                        const wishlistBadgeContainers = document.querySelectorAll('a[href*="/favorites"], a[href*="/wishlist"]');
+                        wishlistBadgeContainers.forEach(container => {
+                            let badge = container.querySelector('.wishlist-badge');
                             let newCount = data.wishlist_count;
-                            
                             if (newCount > 0) {
                                 if (!badge) {
                                     badge = document.createElement('span');
                                     badge.className = 'wishlist-badge absolute -top-1 -right-1 bg-purple-600 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[16px] text-center';
-                                    wishlistBadgeContainer.appendChild(badge);
+                                    container.appendChild(badge);
                                 }
                                 badge.textContent = newCount;
-                            } else {
-                                if (badge) {
-                                    badge.remove();
-                                }
+                            } else if (badge) {
+                                badge.remove();
                             }
-                        }
+                        });
                     }
                 })
                 .catch(err => {
-                    console.error('AJAX Wishlist Error:', err);
+                    console.error('AJAX Wishlist Fallback:', err);
+                    form.submit();
                 });
             } else if (action.includes('add_to_cart')) {
                 e.preventDefault();
                 
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
                 fetch(action, {
                     method: 'POST',
                     headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrfToken || ''
                     }
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Show dynamic success toast
                         showToast(data.message || 'Added to cart!', 'success');
                         
                         // Update global header cart count badge
@@ -271,6 +290,22 @@
                 })
                 .catch(err => {
                     console.error('AJAX Cart Error:', err);
+                });
+            }
+        });
+
+        // Auto-inject CSRF token into all POST forms
+        document.addEventListener('DOMContentLoaded', () => {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            if (csrfToken) {
+                document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(form => {
+                    if (!form.querySelector('input[name="csrf_token"]')) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'csrf_token';
+                        input.value = csrfToken;
+                        form.appendChild(input);
+                    }
                 });
             }
         });

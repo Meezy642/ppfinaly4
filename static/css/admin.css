@@ -1345,3 +1345,94 @@ textarea.form-control {
 .btn-page-back i {
     font-size: 0.85rem;
 }
+
+
+/* --- Dark Mode for Admin Panel --- */
+html.dark-mode, body.dark-mode {
+    --bg-body: #0b1120;
+    --bg-sidebar: #0f172a;
+    --bg-sidebar-active: rgba(59, 130, 246, 0.2);
+    --bg-card: #1e293b;
+    --bg-topbar: #0f172a;
+    --bg-input: #0b1120;
+    --bg-hover: rgba(255, 255, 255, 0.05);
+
+    --border-color: #334155;
+    --border-light: #1e293b;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-sidebar: #c2c7d0;
+}
+
+body.dark-mode {
+    background-color: var(--bg-body);
+    color: var(--text-primary);
+}
+
+body.dark-mode .topbar {
+    background: var(--bg-topbar);
+    border-bottom: 1px solid var(--border-color);
+}
+
+body.dark-mode .sidebar {
+    background: var(--bg-sidebar);
+}
+
+body.dark-mode .card {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+body.dark-mode .card-header {
+    background: transparent;
+    border-bottom-color: var(--border-color);
+}
+
+body.dark-mode .admin-table {
+    color: var(--text-primary);
+}
+
+body.dark-mode .admin-table th {
+    background: #0b1120;
+    color: #cbd5e1;
+    border-bottom-color: var(--border-color);
+}
+
+body.dark-mode .admin-table td {
+    border-bottom-color: var(--border-color);
+    color: #cbd5e1;
+}
+
+body.dark-mode .product-title-cell {
+    color: #f8fafc !important;
+}
+
+body.dark-mode .admin-table tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-select {
+    background: var(--bg-input);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+body.dark-mode .user-dropdown {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .btn-page-back {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+body.dark-mode .stat-card {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}

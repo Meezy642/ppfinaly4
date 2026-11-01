@@ -752,12 +752,16 @@ html.light-mode {
     --neon-glow-accent: 0 0 15px rgba(8, 145, 178, 0.15);
 }
 
-/* Page body gradient overrides */
-html.light-mode body {
+/* Page body and root background overrides */
+html.light-mode,
+html.light-mode.bg-zinc-950,
+html.light-mode body,
+html.light-mode body.bg-zinc-950 {
+    background-color: #f8fafc !important;
     background-image: 
         radial-gradient(circle at 10% 20%, rgba(124, 58, 237, 0.04), transparent 50%),
-        radial-gradient(circle at 90% 80%, rgba(8, 145, 178, 0.04), transparent 50%);
-    color: var(--text-primary);
+        radial-gradient(circle at 90% 80%, rgba(8, 145, 178, 0.04), transparent 50%) !important;
+    color: #0f172a !important;
 }
 
 /* Headings colors */
@@ -934,9 +938,58 @@ html.light-mode .user-avatar-circle {
 }
 
 /* Navigation headers and sticky bar */
-html.light-mode header {
-    background-color: rgba(255, 255, 255, 0.8) !important;
+html.light-mode header,
+html.light-mode .bg-zinc-950\/70,
+html.light-mode .bg-zinc-950\/80 {
+    background-color: rgba(255, 255, 255, 0.95) !important;
     border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+    backdrop-filter: blur(12px) !important;
+}
+
+html.light-mode header a.group span.font-heading {
+    color: #0f172a !important;
+}
+
+html.light-mode header nav a {
+    color: #475569 !important;
+}
+
+html.light-mode header nav a:hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+html.light-mode header nav a.bg-zinc-800\/60 {
+    background-color: #f1f5f9 !important;
+    color: #7c3aed !important;
+}
+
+html.light-mode #theme-toggle {
+    color: #475569 !important;
+}
+
+html.light-mode #theme-toggle:hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+html.light-mode header a[title="Favorites"],
+html.light-mode header a[title="Cart"] {
+    color: #475569 !important;
+}
+
+html.light-mode header a[title="Favorites"]:hover,
+html.light-mode header a[title="Cart"]:hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+html.light-mode header #user-menu-button span {
+    color: #334155 !important;
+}
+
+html.light-mode header .bg-zinc-850 {
+    background-color: #e2e8f0 !important;
 }
 
 /* Mobile dropdown menu */

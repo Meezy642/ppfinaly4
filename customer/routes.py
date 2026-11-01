@@ -4,11 +4,14 @@ import random
 import datetime
 import requests
 import smtplib
+import urllib.parse
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Blueprint, render_template, request, redirect, url_for, make_response, session, flash, jsonify, current_app
 from itsdangerous import URLSafeTimedSerializer
 from models import db, User, Product, Order, Contact
+from extensions import limiter, csrf
 from upload_config import save_uploaded_file
 
 customer_bp = Blueprint('customer', __name__)
@@ -72,14 +75,26 @@ def send_reset_email(to_email, username, reset_url):
         return False
 
 def send_telegram_message(text):
-    chat_ids = [cid.strip() for cid in CHAT_ID.split(",") if cid.strip()]
-    headers = {"accept": "application/json", "content-type": "application/json"}
+    chat_ids = [cid.strip() for cid in CHAT_ID.split(',') if cid.strip()]
+    headers = {'accept': 'application/json', 'content-type': 'application/json'}
     for cid in chat_ids:
-        payload = {"text": text, "parse_mode": "HTML", "chat_id": cid}
+        payload = {'text': text, 'parse_mode': 'HTML', 'chat_id': cid}
         try:
-            requests.post(TELEGRAM_URL, json=payload, headers=headers, timeout=5)
+            r = requests.post(TELEGRAM_URL, json=payload, headers=headers, timeout=10)
+            if not r.ok:
+                print(f'Telegram notification returned {r.status_code}: {r.text}, trying plain text fallback...')
+                import re
+                plain_text = re.sub(r'<[^>]+>', '', text)
+                payload_fallback = {'text': plain_text, 'chat_id': cid}
+                r2 = requests.post(TELEGRAM_URL, json=payload_fallback, headers=headers, timeout=10)
+                if r2.ok:
+                    print(f'Telegram plain text delivered to {cid}')
+                else:
+                    print(f'Telegram plain text fallback failed for {cid}: {r2.status_code} {r2.text}')
+            else:
+                print(f'Telegram notification delivered successfully to {cid}')
         except Exception as e:
-            print(f"Telegram notification error: {e}")
+            print(f'Telegram notification error for {cid}: {e}')
 
 @customer_bp.route('/')
 def home():
@@ -126,6 +141,7 @@ def products():
     )
 
 @customer_bp.route('/contact', methods=['GET', 'POST'])
+@limiter.limit("15 per minute")
 def contact():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -152,6 +168,7 @@ def contact():
 
     return render_template('customer/contact.html')
 
+@csrf.exempt
 @customer_bp.route('/api/book_showroom', methods=['POST'])
 def book_showroom():
     data = request.get_json() or {}
@@ -186,11 +203,12 @@ def about():
 # --- AUTHENTICATION ---
 
 @customer_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("15 per minute")
 def login():
     # If user is already logged in, redirect them directly
     if 'username' in session:
         logged_in_user = User.query.filter_by(username=session['username']).first()
-        if logged_in_user and logged_in_user.role in ['admin', 'staff']:
+        if logged_in_user and logged_in_user.role in ['admin', 'staff', 'Super Administrator']:
             return redirect(url_for('admin_dashboard.admin_dashboard'))
         elif session.get('user_role') in ['admin', 'staff', 'Super Administrator']:
             return redirect(url_for('admin_dashboard.admin_dashboard'))
@@ -203,13 +221,22 @@ def login():
         user = User.query.filter((User.username == username_or_email) | (User.email == username_or_email)).first()
 
         if user and user.check_password(password):
+            # Admin and Staff cannot log in via Customer portal
+            if user.role in ['admin', 'staff', 'Super Administrator']:
+                flash("Admins cannot log in here. Only customers can log in on this page. Please use the Admin Portal.", "error")
+                return redirect(url_for('customer.login'))
+
+            session.clear()
+            session.permanent = bool(request.form.get('remember'))
+            session['user_id'] = user.id
             session['username'] = user.username
+            session['user_email'] = user.email
             session['user_role'] = user.role
             flash(f"Welcome back, {user.name or user.username}!", "success")
-            
-            if user.role in ['admin', 'staff']:
-                return redirect(url_for('admin_dashboard.admin_dashboard'))
             return redirect(url_for('customer.home'))
+        elif username_or_email.lower() in ['admin', 'admin@localhost.com', 'admin@store.com', 'admin@pspstore.com']:
+            flash("Admins cannot log in here. Please use the Admin Portal.", "error")
+            return redirect(url_for('customer.login'))
         else:
             flash("Invalid username/email or password.", "error")
             return redirect(url_for('customer.login'))
@@ -217,6 +244,7 @@ def login():
     return render_template('share/login.html')
 
 @customer_bp.route('/register', methods=['GET', 'POST'])
+@limiter.limit("15 per minute")
 def register():
     # If user is already logged in, redirect them directly
     if 'username' in session:
@@ -268,49 +296,113 @@ def logout():
 
 # --- WISHLIST ---
 
+def safe_parse_cookie(cookie_str):
+    if not cookie_str:
+        return None
+    raw = urllib.parse.unquote(cookie_str).strip()
+    raw = re.sub(r'\\([0-7]{3})', lambda m: chr(int(m.group(1), 8)), raw).strip()
+    try:
+        data = json.loads(raw)
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except Exception:
+                pass
+        return data
+    except Exception:
+        try:
+            trimmed = raw.strip('"\'')
+            data = json.loads(trimmed)
+            if isinstance(data, str):
+                data = json.loads(data)
+            return data
+        except Exception:
+            return None
+
+def get_wishlist_from_cookie():
+    cookie = request.cookies.get('wishlist')
+    data = safe_parse_cookie(cookie)
+    ids = []
+    if isinstance(data, list):
+        for x in data:
+            if isinstance(x, dict):
+                v = x.get('id') or x.get('item_id') or x.get('product_id')
+                if v is not None and str(v).isdigit():
+                    ids.append(int(v))
+            elif str(x).isdigit():
+                ids.append(int(x))
+    elif isinstance(data, dict):
+        for k in data.keys():
+            if str(k).isdigit():
+                ids.append(int(k))
+    elif isinstance(data, (int, str)) and str(data).isdigit():
+        ids.append(int(data))
+    elif not ids and cookie:
+        try:
+            raw = urllib.parse.unquote(cookie).strip().strip('[]"\'')
+            ids = [int(x.strip()) for x in raw.split(',') if x.strip().isdigit()]
+        except Exception:
+            pass
+    return ids
+
 @customer_bp.route('/favorites')
+@customer_bp.route('/wishlist')
 def favorites():
-    wishlist_cookie = request.cookies.get('wishlist')
-    wishlist = json.loads(wishlist_cookie) if wishlist_cookie else []
+    wishlist = get_wishlist_from_cookie()
+    wishlist_items = []
+    valid_ids = []
+    if wishlist:
+        from items import items
+        for pid in wishlist:
+            prod = Product.query.get(pid)
+            if prod:
+                wishlist_items.append(prod.to_dict())
+                valid_ids.append(pid)
+            else:
+                fallback_item = next((it for it in items if it.get('id') == pid), None)
+                if fallback_item:
+                    wishlist_items.append(fallback_item)
+                    valid_ids.append(pid)
+    
+    resp = make_response(render_template('customer/wishlist.html', wishlist_items=wishlist_items, wishlist=valid_ids))
+    if len(valid_ids) != len(wishlist):
+        resp.set_cookie('wishlist', json.dumps(valid_ids), max_age=60 * 60 * 24 * 7, path='/')
+    return resp
 
-    products = Product.query.filter(Product.id.in_(wishlist)).all() if wishlist else []
-    wishlist_items = [p.to_dict() for p in products]
-    return render_template('customer/wishlist.html', wishlist_items=wishlist_items)
-
-@customer_bp.route('/add_to_wishlist/<int:item_id>', methods=['POST'])
+@customer_bp.route('/add_to_wishlist/<int:item_id>', methods=['GET', 'POST'])
+@customer_bp.route('/add-to-wishlist/<int:item_id>', methods=['GET', 'POST'])
 def add_to_wishlist(item_id):
-    wishlist_cookie = request.cookies.get('wishlist')
-    wishlist = json.loads(wishlist_cookie) if wishlist_cookie else []
-
+    wishlist = get_wishlist_from_cookie()
     if item_id not in wishlist:
         wishlist.append(item_id)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        response = make_response(jsonify({'success': True, 'wishlist_count': len(wishlist)}))
+        response = make_response(jsonify({'success': True, 'wishlist_count': len(wishlist), 'in_wishlist': True}))
         response.headers['Content-Type'] = 'application/json'
-        response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7)
+        response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7, path='/')
         return response
 
+    flash("Added to favorites!", "success")
     response = make_response(redirect(request.referrer or url_for('customer.products')))
-    response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7)
+    response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7, path='/')
     return response
 
-@customer_bp.route('/remove_from_wishlist/<int:item_id>', methods=['POST'])
+@customer_bp.route('/remove_from_wishlist/<int:item_id>', methods=['GET', 'POST'])
+@customer_bp.route('/remove-from-wishlist/<int:item_id>', methods=['GET', 'POST'])
 def remove_from_wishlist(item_id):
-    wishlist_cookie = request.cookies.get('wishlist')
-    wishlist = json.loads(wishlist_cookie) if wishlist_cookie else []
-
+    wishlist = get_wishlist_from_cookie()
     if item_id in wishlist:
         wishlist.remove(item_id)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        response = make_response(jsonify({'success': True, 'wishlist_count': len(wishlist)}))
+        response = make_response(jsonify({'success': True, 'wishlist_count': len(wishlist), 'in_wishlist': False}))
         response.headers['Content-Type'] = 'application/json'
-        response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7)
+        response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7, path='/')
         return response
 
+    flash("Removed from favorites.", "info")
     response = make_response(redirect(request.referrer or url_for('customer.favorites')))
-    response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7)
+    response.set_cookie('wishlist', json.dumps(wishlist), max_age=60 * 60 * 24 * 7, path='/')
     return response
 
 # --- CART ---
@@ -325,23 +417,63 @@ def view_product(item_id):
     related = Product.query.filter(Product.category == product.category, Product.id != item_id).limit(4).all()
     related_products = [p.to_dict() for p in related]
 
-    wishlist_cookie = request.cookies.get('wishlist')
-    wishlist = json.loads(wishlist_cookie) if wishlist_cookie else []
+    wishlist = get_wishlist_from_cookie()
     in_wishlist = item_id in wishlist
+
+    # Build guaranteed 4 distinct gallery images
+    gallery_images = []
+    if current_item.get('images'):
+        for img_obj in current_item['images']:
+            url = img_obj.get('image_url') or img_obj.get('name')
+            if url and url not in gallery_images:
+                gallery_images.append(url)
+    if not gallery_images:
+        gallery_images = [
+            f'/static/uploads/fakestore/product_{item_id}.jpg',
+            f'/static/uploads/gallery/product_{item_id}_angle_2.jpg',
+            f'/static/uploads/gallery/product_{item_id}_angle_3.jpg',
+            f'/static/uploads/gallery/product_{item_id}_angle_4.jpg'
+        ]
+    fallback_angles = [
+        f'/static/uploads/fakestore/product_{item_id}.jpg',
+        f'/static/uploads/gallery/product_{item_id}_angle_2.jpg',
+        f'/static/uploads/gallery/product_{item_id}_angle_3.jpg',
+        f'/static/uploads/gallery/product_{item_id}_angle_4.jpg'
+    ]
+    for fb in fallback_angles:
+        if len(gallery_images) >= 4:
+            break
+        if fb not in gallery_images:
+            gallery_images.append(fb)
+    while len(gallery_images) < 4:
+        gallery_images.append(gallery_images[0])
+    gallery_images = gallery_images[:4]
 
     return render_template(
         'customer/view_product.html',
         item=current_item,
         related_products=related_products,
-        in_wishlist=in_wishlist
+        in_wishlist=in_wishlist,
+        wishlist=wishlist,
+        gallery_images=gallery_images,
+        gallery=gallery_images
     )
+
+def get_cart_from_cookie():
+    cart_cookie = request.cookies.get('cart')
+    data = safe_parse_cookie(cart_cookie)
+    if isinstance(data, dict):
+        clean_cart = {}
+        for k, v in data.items():
+            if str(k).isdigit() and int(v) > 0:
+                clean_cart[str(k)] = int(v)
+        return clean_cart
+    return {}
 
 @customer_bp.route('/add_to_cart/<int:item_id>', methods=['GET', 'POST'])
 @customer_bp.route('/add-to-cart/<int:item_id>', methods=['GET', 'POST'])
 def add_to_cart(item_id):
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
-
+    cart = get_cart_from_cookie()
     str_item_id = str(item_id)
     cart[str_item_id] = cart.get(str_item_id, 0) + 1
 
@@ -355,19 +487,17 @@ def add_to_cart(item_id):
             "cart_count": cart_count,
             "message": f"Added {prod_title} to your cart!"
         }))
-        response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7)
+        response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7, path='/')
         return response
 
     flash(f"Added {prod_title} to your cart!", "success")
     response = make_response(redirect(request.referrer or url_for('customer.cart')))
-    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7)
+    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7, path='/')
     return response
 
 @customer_bp.route('/cart')
 def cart():
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
-
+    cart = get_cart_from_cookie()
     cart_items = []
     total_price = 0
 
@@ -396,67 +526,64 @@ def cart():
         total_price=round(total_price, 2)
     )
 
-@customer_bp.route('/increase_cart/<int:item_id>', methods=['POST'])
+@customer_bp.route('/increase_cart/<int:item_id>', methods=['GET', 'POST'])
+@customer_bp.route('/increase-cart/<int:item_id>', methods=['GET', 'POST'])
 def increase_cart(item_id):
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
-
+    cart = get_cart_from_cookie()
     str_item_id = str(item_id)
     if str_item_id in cart:
         cart[str_item_id] += 1
 
     response = make_response(redirect(url_for('customer.cart')))
-    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7)
+    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7, path='/')
     return response
 
-@customer_bp.route('/decrease_cart/<int:item_id>', methods=['POST'])
+@customer_bp.route('/decrease_cart/<int:item_id>', methods=['GET', 'POST'])
+@customer_bp.route('/decrease-cart/<int:item_id>', methods=['GET', 'POST'])
 def decrease_cart(item_id):
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
-
+    cart = get_cart_from_cookie()
     str_item_id = str(item_id)
     if str_item_id in cart:
         if cart[str_item_id] > 1:
             cart[str_item_id] -= 1
         else:
-            cart.pop(str_item_id)
+            cart.pop(str_item_id, None)
 
     response = make_response(redirect(url_for('customer.cart')))
-    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7)
+    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7, path='/')
     return response
 
-@customer_bp.route('/remove_from_cart/<int:item_id>', methods=['POST'])
+@customer_bp.route('/remove_from_cart/<int:item_id>', methods=['GET', 'POST'])
+@customer_bp.route('/remove-from-cart/<int:item_id>', methods=['GET', 'POST'])
 def remove_from_cart(item_id):
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
-
+    cart = get_cart_from_cookie()
     str_item_id = str(item_id)
     if str_item_id in cart:
-        cart.pop(str_item_id)
+        cart.pop(str_item_id, None)
 
     flash("Item removed from cart.", "success")
     response = make_response(redirect(url_for('customer.cart')))
-    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7)
+    response.set_cookie('cart', json.dumps(cart), max_age=60 * 60 * 24 * 7, path='/')
     return response
 
-@customer_bp.route('/clear_cart')
+@customer_bp.route('/clear_cart', methods=['GET', 'POST'])
+@customer_bp.route('/clear-cart', methods=['GET', 'POST'])
 def clear_cart():
     flash("Shopping cart cleared.", "success")
     response = make_response(redirect(url_for('customer.cart')))
-    response.delete_cookie('cart')
+    response.delete_cookie('cart', path='/')
     return response
 
 # --- CHECKOUT & ORDERS ---
 
 @customer_bp.route('/checkout')
 def checkout():
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
-
+    cart = get_cart_from_cookie()
     cart_items = []
-    total_price = 0
+    total_price = 0.0
 
     if cart:
+        from items import items
         product_ids = [int(k) for k in cart.keys() if str(k).isdigit()]
         products = {p.id: p.to_dict() for p in Product.query.filter(Product.id.in_(product_ids)).all()}
         
@@ -464,8 +591,11 @@ def checkout():
             try:
                 pid = int(item_id_str)
                 product = products.get(pid)
+                if not product:
+                    product = next((it for it in items if it.get('id') == pid), None)
                 if product:
-                    item_total = product['price'] * quantity
+                    price = float(product.get('price', 0.0))
+                    item_total = price * quantity
                     total_price += item_total
                     cart_items.append({
                         'product': product,
@@ -476,14 +606,14 @@ def checkout():
                 continue
 
     if not cart_items:
-        flash("Your cart is empty. Please add items before checkout.", "error")
+        flash('Your cart is empty. Please add items before checkout.', 'error')
         return redirect(url_for('customer.cart'))
 
-    user_email = ""
+    user_email = ''
     username = session.get('username')
     if username:
         user = User.query.filter_by(username=username).first()
-        user_email = user.email if user else ""
+        user_email = user.email if user else ''
 
     return render_template(
         'customer/checkout.html',
@@ -503,42 +633,48 @@ def place_order():
     
     payment_method = request.form.get('payment_method', 'khqr')
     if payment_method == 'card':
-        payment_display = "Visa / MasterCard - Paid"
+        payment_display = 'Visa / MasterCard - Paid'
     elif payment_method == 'paypal':
-        payment_display = "PayPal Account - Paid"
+        payment_display = 'PayPal Account - Paid'
     else:
-        payment_display = "Bakong KHQR - Paid"
+        payment_display = 'Bakong KHQR - Paid'
 
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
+    cart = get_cart_from_cookie()
 
     if not cart:
-        flash("Your cart was empty. Order failed.", "error")
+        flash('Your cart was empty. Order failed.', 'error')
         return redirect(url_for('customer.cart'))
 
+    from items import items
     product_ids = [int(k) for k in cart.keys() if str(k).isdigit()]
     products = {p.id: p.to_dict() for p in Product.query.filter(Product.id.in_(product_ids)).all()}
 
     items_list = []
-    item_list_text = ""
-    total_price = 0
+    item_list_text = ''
+    total_price = 0.0
 
     for item_id_str, quantity in cart.items():
         try:
             pid = int(item_id_str)
             product = products.get(pid)
+            if not product:
+                product = next((it for it in items if it.get('id') == pid), None)
             if product:
-                item_total = product['price'] * quantity
+                price = float(product.get('price', 0.0))
+                title = product.get('title', product.get('name', 'Product'))
+                img = product.get('image', product.get('thumbnail', ''))
+                item_total = price * quantity
                 total_price += item_total
                 items_list.append({
-                    "title": product['title'],
-                    "quantity": quantity,
-                    "price": product['price'],
-                    "image": product['image']
+                    'title': title,
+                    'quantity': quantity,
+                    'price': price,
+                    'image': img
                 })
-                item_list_text += f"📦 <b>{product['title'][:25]}...</b>\n"
-                item_list_text += f"   └ Qty: {quantity} × ${product['price']:.2f} = <b>${item_total:.2f}</b>\n\n"
-        except Exception:
+                item_list_text += f'📦 <b>{title[:25]}...</b>\n'
+                item_list_text += f'   └ Qty: {quantity} × ${price:.2f} = <b>${item_total:.2f}</b>\n\n'
+        except Exception as e:
+            print(f'Error parsing item {item_id_str}: {e}')
             continue
 
     order_id = f"YS-{random.randint(100000, 999999)}"

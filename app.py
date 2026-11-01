@@ -1,18 +1,22 @@
 import os
 import json
-from flask import Flask, url_for, session, request, render_template, redirect, flash
+from flask import Flask, url_for, session, request, render_template, redirect, flash, jsonify
 from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFError
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-from models import db, User, Product, Order, Contact
+from extensions import db, csrf, limiter, cors
+from models import User, Product, Category, ProductImage, Order, Contact
 from upload_config import init_upload_config
 from customer import customer_bp
 from front import front_bp
 from auth import auth_bp
 from admin import admin_bp, dashboard_bp, product_bp, category_bp
+from api import api_bp
+from core import core_bp
 from items import items
 
 app = Flask(__name__)
@@ -23,9 +27,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize File Upload Configuration
 init_upload_config(app)
 
-# Initialize Database & Migrations
+# Initialize Database, Migrations & Security Extensions (CSRF, Limiter, CORS)
 db.init_app(app)
 migrate = Migrate(app, db)
+csrf.init_app(app)
+limiter.init_app(app)
+cors.init_app(app, resources={r"/api/*": {"origins": "*"}, r"/core/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Register Blueprints
 app.register_blueprint(front_bp)
@@ -35,6 +42,47 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(product_bp)
 app.register_blueprint(category_bp)
+app.register_blueprint(api_bp)
+app.register_blueprint(core_bp, url_prefix='/core/api', name='core_api')
+
+# REST API endpoints are exempt from CSRF tokens
+csrf.exempt(api_bp)
+csrf.exempt(core_bp)
+
+# Cookie-based shopping cart and wishlist actions are client-state actions; exempt from CSRF
+from customer.routes import (
+    add_to_cart as cust_add_to_cart,
+    increase_cart as cust_inc_cart,
+    decrease_cart as cust_dec_cart,
+    remove_from_cart as cust_rem_cart,
+    clear_cart as cust_clr_cart,
+    add_to_wishlist as cust_add_wish,
+    remove_from_wishlist as cust_rem_wish
+)
+csrf.exempt(cust_add_to_cart)
+csrf.exempt(cust_inc_cart)
+csrf.exempt(cust_dec_cart)
+csrf.exempt(cust_rem_cart)
+csrf.exempt(cust_clr_cart)
+csrf.exempt(cust_add_wish)
+csrf.exempt(cust_rem_wish)
+
+from front.store import (
+    add_to_cart as front_add_to_cart,
+    increase_cart as front_inc_cart,
+    decrease_cart as front_dec_cart,
+    remove_from_cart as front_rem_cart,
+    clear_cart as front_clr_cart,
+    add_to_wishlist as front_add_wish,
+    remove_from_wishlist as front_rem_wish
+)
+csrf.exempt(front_add_to_cart)
+csrf.exempt(front_inc_cart)
+csrf.exempt(front_dec_cart)
+csrf.exempt(front_rem_cart)
+csrf.exempt(front_clr_cart)
+csrf.exempt(front_add_wish)
+csrf.exempt(front_rem_wish)
 
 # --- SMART URL_FOR RESOLVER FOR COMPATIBILITY ---
 ENDPOINT_ALIASES = {
@@ -60,8 +108,10 @@ ENDPOINT_ALIASES = {
     'admin_products': 'admin_product.admin_products',
     'admin_add_product': 'admin_product.admin_add_product',
     'admin_edit_product': 'admin_product.admin_edit_product',
-    'admin_delete_product': 'admin_product.admin_delete_product',
     'admin_categories': 'admin_category.admin_categories',
+    'admin_add_category': 'admin_category.admin_add_category',
+    'admin_edit_category': 'admin_category.admin_edit_category',
+    'admin_delete_category': 'admin_category.admin_delete_category',
     'home': 'customer.home',
     'products': 'customer.products',
     'contact': 'customer.contact',
@@ -141,15 +191,14 @@ def utility_processor():
 # --- GLOBAL CONTEXT PROCESSOR FOR CART & USER INFO ---
 @app.context_processor
 def inject_global_template_vars():
+    from customer.routes import get_wishlist_from_cookie, get_cart_from_cookie
     # 1. Cart Count
-    cart_cookie = request.cookies.get('cart')
-    cart = json.loads(cart_cookie) if cart_cookie else {}
+    cart = get_cart_from_cookie()
     cart_count = sum(cart.values()) if isinstance(cart, dict) else 0
 
     # 2. Wishlist Count
-    wishlist_cookie = request.cookies.get('wishlist')
-    wishlist = json.loads(wishlist_cookie) if wishlist_cookie else []
-    wishlist_count = len(wishlist) if isinstance(wishlist, list) else 0
+    wishlist = get_wishlist_from_cookie()
+    wishlist_count = len(wishlist)
 
     # 3. Logged-in User, Role, Profile Pic & Display Name
     logged_in_user = session.get('username')
@@ -183,23 +232,46 @@ def inject_global_template_vars():
 with app.app_context():
     db.create_all()
 
-    # 1. Seed Products from items.py if empty
+    # 1. Seed Categories if empty (5pts)
+    if Category.query.count() == 0:
+        default_cats = [
+            ("men's clothing", "https://fakestoreapi.com/img/81fPKd-2AYL._AC_SL1500_.jpg", "Men's fashion, shirts, and casual wear"),
+            ("jewelery", "https://fakestoreapi.com/img/71pWzhdJNwL._AC_UL640_QL65_ML3_.jpg", "Precious jewelry, rings, and bracelets"),
+            ("electronics", "https://fakestoreapi.com/img/61IBBVJvSDL._AC_SY879_.jpg", "Laptops, storage drives, and monitors"),
+            ("women's clothing", "https://fakestoreapi.com/img/51Y5NI-I5jL._AC_UX679_.jpg", "Women's trendy tops, coats, and jackets")
+        ]
+        for c_name, c_img, c_desc in default_cats:
+            cat = Category(name=c_name, image=c_img, description=c_desc)
+            db.session.add(cat)
+        db.session.commit()
+        print("Default categories seeded successfully.")
+
+    cat_map = {c.name.lower(): c.id for c in Category.query.all()}
+    fallback_cat_id = list(cat_map.values())[0] if cat_map else 1
+
+    # 2. Seed Products (5pts) & ProductImages (5pts) from items.py if empty
     if Product.query.count() == 0:
         for itm in items:
-            rating = itm.get('rating', {})
+            cat_name = itm.get('category', 'general').strip().lower()
+            cat_id = cat_map.get(cat_name, fallback_cat_id)
+            price_val = float(itm['price'])
             p = Product(
                 id=itm['id'],
-                title=itm['title'],
-                price=float(itm['price']),
-                description=itm.get('description', ''),
-                category=itm.get('category', 'general'),
-                image=itm.get('image', ''),
-                rating_rate=float(rating.get('rate', 4.0)),
-                rating_count=int(rating.get('count', 0))
+                name=itm['title'],
+                thumbnail=itm.get('image', ''),
+                Cost=round(price_val * 0.7, 2),
+                Price=price_val,
+                Stock=50,
+                CategoryId=cat_id,
+                description=itm.get('description', '')
             )
             db.session.add(p)
+            db.session.flush()
+            if itm.get('image'):
+                p_img = ProductImage(ProductId=p.id, name=itm['image'])
+                db.session.add(p_img)
         db.session.commit()
-        print("Seeded products successfully into SQLite database.")
+        print("Seeded products & product images successfully into SQLite database.")
 
     # 2. Seed Users from users.json if empty, or ensure default admin
     if User.query.count() == 0:
@@ -277,8 +349,24 @@ with app.app_context():
         except Exception as e:
             print(f"Error seeding contacts: {e}")
 
+# --- ERROR HANDLERS FOR CSRF & RATE LIMITING ---
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    if request.path.startswith('/api/') or request.path.startswith('/core/api/'):
+        return jsonify({'success': False, 'message': 'CSRF token missing or invalid'}), 400
+    flash("Session or CSRF token expired. Please refresh and try again.", "danger")
+    return redirect(request.referrer or url_for('customer.home'))
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    if request.path.startswith('/api/') or request.path.startswith('/core/api/'):
+        return jsonify({'error': 'Rate limit exceeded', 'message': str(e.description)}), 429
+    flash("Too many requests! Please slow down and try again.", "danger")
+    return redirect(request.referrer or url_for('customer.home'))
+
 # --- ADMIN PORTAL AUTHENTICATION ---
 @app.route('/admin/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def admin_login():
     if session.get('username') and session.get('user_role') in ['admin', 'staff', 'Super Administrator']:
         return redirect(request.args.get('next') or url_for('admin_dashboard.admin_dashboard'))

@@ -32,7 +32,7 @@
                     <tr>
                         <td>{{ product.id }}</td>
                         <td>
-                            <img src="{{ product.image }}" alt="{{ product.title }}" class="product-thumb">
+                            <img src="{{ product.image }}" alt="{{ product.title }}" class="product-thumb" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: #ffffff;" onerror="this.onerror=null; this.src='/static/uploads/fakestore/product_{{ product.id }}.jpg';">
                         </td>
                         <td>
                             <span class="product-title-cell">{{ product.title[:40] }}{% if product.title|length > 40 %}...{% endif %}</span>

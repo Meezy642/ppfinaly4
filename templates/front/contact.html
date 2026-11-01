@@ -44,6 +44,7 @@
                 </div>
                 
                 <form action="{{ url_for('contact') }}" method="POST" class="auth-form space-y-4">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="form-group-field">
                             <label for="name" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Full Name</label>
@@ -555,10 +556,12 @@
         const formattedDate = dateObj.toLocaleDateString('en-US', options);
         
         // Send data to server via AJAX
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         fetch('/api/book_showroom', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken || ''
             },
             body: JSON.stringify({
                 name: name,

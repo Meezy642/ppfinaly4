@@ -37,6 +37,7 @@
             <div class="absolute inset-0 bg-gradient-to-b from-purple-500/5 via-transparent to-transparent pointer-events-none"></div>
             
             <form id="checkoutForm" action="{{ url_for('place_order') }}" method="POST" class="space-y-8">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <!-- Hidden payment method parameter -->
                 <input type="hidden" name="payment_method" id="payment-method-input" value="card">
                 

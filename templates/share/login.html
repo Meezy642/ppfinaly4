@@ -10,8 +10,25 @@
             <p>Sign in to your YSTAA SHOPP account</p>
         </div>
 
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages" style="margin-bottom: 1rem;">
+                {% for category, message in messages %}
+                <div style="padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.875rem; margin-bottom: 0.5rem; {{ 'background-color: rgba(220, 38, 38, 0.2); border: 1px solid #ef4444; color: #fca5a5;' if category in ['error', 'danger'] else 'background-color: rgba(22, 163, 74, 0.2); border: 1px solid #22c55e; color: #86efac;' }}">
+                    <i class="fas {{ 'fa-exclamation-circle' if category in ['error', 'danger'] else 'fa-check-circle' }}" style="margin-right: 0.5rem;"></i>
+                    {{ message }}
+                    {% if 'Admin Portal' in message or 'admin' in message|lower %}
+                        <a href="{{ url_for('admin_login') }}" style="color: #93c5fd; text-decoration: underline; margin-left: 0.35rem; font-weight: 600;">Go to Admin Login &rarr;</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+
         <!-- Core Authentication Form -->
         <form action="{{ url_for('login') }}" method="POST" class="auth-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <div class="form-group-field">
                 <label for="username">Username or Email</label>
@@ -54,6 +71,9 @@
         <!-- Redirection Link -->
         <div class="auth-footer-link">
             <p>New to YSTAA SHOPP? <a href="{{ url_for('register') }}">Create an account</a></p>
+            <p style="margin-top: 0.75rem; font-size: 0.85rem; color: #94a3b8;">
+                Are you an administrator? <a href="{{ url_for('admin_login') }}" style="color: #a78bfa; font-weight: 600; text-decoration: underline;">Admin Portal Login &rarr;</a>
+            </p>
         </div>
 
     </div>

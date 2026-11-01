@@ -1,15 +1,16 @@
 from flask import render_template, request, redirect, url_for, flash, session
-from extensions import db
+from extensions import db, limiter
 from models.user import User
 from . import front_bp
 
 # </front/login>
 @front_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("15 per minute")
 def login():
     # If user is already logged in, redirect them directly
     if "username" in session:
         logged_in_user = User.query.filter_by(username=session["username"]).first()
-        if logged_in_user and logged_in_user.role in ["admin", "staff"]:
+        if logged_in_user and logged_in_user.role in ["admin", "staff", "Super Administrator"]:
             return redirect(url_for("admin_dashboard.admin_dashboard"))
         elif session.get("user_role") in ["admin", "staff", "Super Administrator"]:
             return redirect(url_for("admin_dashboard.admin_dashboard"))
@@ -24,12 +25,21 @@ def login():
         ).first()
 
         if user and user.check_password(password):
+            if user.role in ["admin", "staff", "Super Administrator"]:
+                flash("Admins cannot log in here. Only customers can log in on this page. Please use the Admin Portal.", "error")
+                return redirect(url_for("front.login"))
+
+            session.clear()
+            session.permanent = bool(request.form.get("remember"))
+            session["user_id"] = user.id
             session["username"] = user.username
+            session["user_email"] = user.email
             session["user_role"] = user.role
             flash(f"Welcome back, {user.name or user.username}!", "success")
-            if user.role in ["admin", "staff"]:
-                return redirect(url_for("admin_dashboard.admin_dashboard"))
             return redirect(url_for("front.home"))
+        elif username_or_email.lower() in ["admin", "admin@localhost.com", "admin@store.com", "admin@pspstore.com"]:
+            flash("Admins cannot log in here. Please use the Admin Portal.", "error")
+            return redirect(url_for("front.login"))
 
         flash("Invalid username/email or password.", "error")
         return redirect(url_for("front.login"))
@@ -38,6 +48,7 @@ def login():
 
 # </front/register>
 @front_bp.route("/register", methods=["GET", "POST"])
+@limiter.limit("15 per minute")
 def register():
     # If user is already logged in, redirect them directly
     if "username" in session:

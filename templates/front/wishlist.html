@@ -20,6 +20,7 @@
                 
                 <!-- Remove Wishlist Form -->
                 <form action="{{ url_for('remove_from_wishlist', item_id=itm.id) }}" method="POST" class="absolute top-4 right-4 z-10">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="w-8 h-8 rounded-lg bg-zinc-900/80 hover:bg-purple-950/80 text-slate-400 hover:text-purple-400 border border-zinc-800 flex items-center justify-center transition-colors cursor-pointer" title="Remove from Favorites">
                         <i class="fas fa-times text-xs"></i>
                     </button>
@@ -48,6 +49,7 @@
             <!-- Add to Cart Footer Action -->
             <div class="p-4 pt-0 mt-auto">
                 <form action="{{ url_for('add_to_cart', item_id=itm.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="w-full flex items-center justify-center gap-2 btn-primary py-2.5 rounded-lg text-white font-bold cursor-pointer text-sm">
                         <i class="fas fa-shopping-cart text-xs"></i> Add to Cart
                     </button>

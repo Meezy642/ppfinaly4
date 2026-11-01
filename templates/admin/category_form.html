@@ -1,0 +1,63 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ 'Edit Category' if edit_mode else 'Add Category' }}{% endblock %}
+{% block breadcrumb %}{{ 'Edit Category' if edit_mode else 'Add Category' }}{% endblock %}
+{% block page_title %}{{ 'Edit Category #' ~ category.id if edit_mode else 'Add New Category' }}{% endblock %}
+{% block page_breadcrumb %}Categories / {{ 'Edit' if edit_mode else 'Add' }}{% endblock %}
+
+{% block content %}
+<div class="card card-form" style="max-width: 700px; margin: 0 auto;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas {{ 'fa-edit' if edit_mode else 'fa-plus-circle' }}"></i>
+            {{ 'Edit Category' if edit_mode else 'Create New Category' }}
+        </h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" action="{{ url_for('admin_category.admin_edit_category', category_id=category.id) if edit_mode else url_for('admin_category.admin_add_category') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="form-group">
+                <label for="name" class="form-label">Category Name <span style="color: #ef4444;">*</span></label>
+                <input type="text" id="name" name="name" class="form-control" 
+                       value="{{ category.name if edit_mode else '' }}"
+                       placeholder="e.g. Electronics, Clothing" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Category Image</label>
+                <div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(139, 92, 246, 0.4); border-radius: 10px; padding: 1rem; margin-bottom: 0.75rem;">
+                    <label for="image_file" style="font-size: 0.85rem; color: #94a3b8; display: block; margin-bottom: 6px;">
+                        <i class="fas fa-upload"></i> Upload Image File (PNG, JPG, WEBP)
+                    </label>
+                    <input type="file" id="image_file" name="image_file" accept="image/*" class="form-control">
+                </div>
+                <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px;">Or enter Image URL:</div>
+                <input type="url" id="image" name="image" class="form-control" 
+                       value="{{ category.image if edit_mode else '' }}"
+                       placeholder="https://example.com/category-image.jpg">
+                {% if edit_mode and category.image %}
+                <div class="image-preview mt-2">
+                    <img src="{{ category.image }}" alt="Preview" class="preview-img" style="max-height: 100px; border-radius: 8px;">
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="description" class="form-label">Description</label>
+                <textarea id="description" name="description" class="form-control" rows="4" 
+                          placeholder="Brief description of this product category">{{ category.description if edit_mode else '' }}</textarea>
+            </div>
+
+            <div class="form-actions" style="margin-top: 1.5rem; display: flex; gap: 10px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> {{ 'Update Category' if edit_mode else 'Save Category' }}
+                </button>
+                <a href="{{ url_for('admin_category.admin_categories') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
