@@ -44,6 +44,22 @@
         <!-- Functional Icon Configuration & Auth -->
         <div class="flex items-center gap-2 sm:gap-4">
 
+            <!-- Header Search Bar & Button -->
+            <form action="{{ url_for('products') }}" method="GET" class="relative hidden sm:flex items-center">
+                <input type="text" 
+                       name="q" 
+                       placeholder="Search products..." 
+                       class="w-36 md:w-48 lg:w-56 pl-8 pr-3 py-1.5 bg-zinc-900/80 border border-zinc-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:w-60 focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300">
+                <button type="submit" class="absolute left-2.5 text-slate-400 hover:text-purple-400 transition-colors cursor-pointer" title="Search">
+                    <i class="fas fa-search text-xs"></i>
+                </button>
+            </form>
+
+            <!-- Mobile Search Icon Button -->
+            <button type="button" onclick="const s = document.getElementById('mobile-search-bar'); if(s) s.classList.toggle('hidden');" class="sm:hidden p-2 rounded-lg transition-colors text-slate-400 hover:bg-zinc-900 hover:text-white cursor-pointer" title="Search">
+                <i class="fas fa-search text-base"></i>
+            </button>
+
             <!-- Theme Toggle Mode Button -->
             <button id="theme-toggle" type="button" onclick="toggleTheme()" class="p-2 rounded-lg transition-colors text-slate-400 hover:bg-zinc-900 hover:text-white cursor-pointer" title="Toggle Theme">
                 <i class="fas fa-sun text-lg text-amber-400" id="theme-toggle-icon"></i>
@@ -105,6 +121,22 @@
             </button>
 
         </div>
+    </div>
+
+    <!-- Mobile Search Bar Dropdown -->
+    <div id="mobile-search-bar" class="hidden sm:hidden bg-zinc-950/95 border-b border-zinc-800 px-4 py-2.5">
+        <form action="{{ url_for('products') }}" method="GET" class="flex items-center gap-2">
+            <div class="relative flex-1 flex items-center">
+                <i class="fas fa-search absolute left-3 text-slate-500 text-xs"></i>
+                <input type="text" 
+                       name="q" 
+                       placeholder="Search products..." 
+                       class="w-full pl-8 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-purple-500">
+            </div>
+            <button type="submit" class="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold flex-shrink-0">
+                Search
+            </button>
+        </form>
     </div>
 
     <!-- Mobile Menu -->

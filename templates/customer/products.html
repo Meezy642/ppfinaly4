@@ -4,18 +4,23 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-8">
     
     <!-- Sidebar / Filters Form -->
-    <form method="GET" action="{{ url_for('products') }}" class="w-full lg:w-72 flex-shrink-0 space-y-6">
+    <form id="filter-form" method="GET" action="{{ url_for('products') }}" class="w-full lg:w-72 flex-shrink-0 space-y-6">
         
         <!-- Search Group -->
         <div class="bg-zinc-900/40 p-6 rounded-2xl border border-zinc-800/80 shadow-sm space-y-3">
             <h4 class="text-xs font-extrabold text-slate-200 uppercase tracking-wider font-heading">Search Catalog</h4>
-            <div class="relative flex items-center">
-                <i class="fas fa-search absolute left-3 text-slate-500 text-sm"></i>
-                <input type="text" 
-                       name="q" 
-                       value="{{ current_q }}" 
-                       placeholder="Type to search..." 
-                       class="w-full pl-9 pr-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all">
+            <div class="flex items-center gap-2">
+                <div class="relative flex-1 flex items-center">
+                    <i class="fas fa-search absolute left-3 text-slate-500 text-sm"></i>
+                    <input type="text" 
+                           name="q" 
+                           value="{{ current_q }}" 
+                           placeholder="Type to search..." 
+                           class="w-full pl-9 pr-3 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all">
+                </div>
+                <button type="submit" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer flex-shrink-0" title="Search">
+                    <i class="fas fa-search text-xs"></i> Search
+                </button>
             </div>
         </div>
 
@@ -87,6 +92,21 @@
             <div>
                 <h2 class="text-2xl font-extrabold tracking-tight text-white font-heading">Shop Directory</h2>
                 <p class="text-xs text-slate-500 mt-1">Found {{ item|length }} products matching your parameters</p>
+            </div>
+            <!-- Quick Search Bar in Directory Header -->
+            <div class="w-full sm:w-auto flex items-center gap-2">
+                <div class="relative flex-1 sm:w-64 flex items-center">
+                    <i class="fas fa-search absolute left-3 text-slate-500 text-xs"></i>
+                    <input type="text" 
+                           name="q" 
+                           value="{{ current_q }}" 
+                           form="filter-form"
+                           placeholder="Search products..." 
+                           class="w-full pl-8 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+                <button type="submit" form="filter-form" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+                    <i class="fas fa-search text-xs"></i> Search
+                </button>
             </div>
         </div>
 

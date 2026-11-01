@@ -1,15 +1,66 @@
 {% extends "admin/layout.html" %}
 
-{% block title %}Products{% endblock %}
-{% block breadcrumb %}Products{% endblock %}
-{% block page_title %}Product List{% endblock %}
-{% block page_breadcrumb %}Products{% endblock %}
+{% block title %}Products
+<script>
+function adminFilterProducts() {
+    const q = (document.getElementById('admin-search-input')?.value || '').toLowerCase();
+    const rows = document.querySelectorAll('#products-table tbody tr');
+    rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}
+{% block breadcrumb %}Products
+<script>
+function adminFilterProducts() {
+    const q = (document.getElementById('admin-search-input')?.value || '').toLowerCase();
+    const rows = document.querySelectorAll('#products-table tbody tr');
+    rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}
+{% block page_title %}Product List
+<script>
+function adminFilterProducts() {
+    const q = (document.getElementById('admin-search-input')?.value || '').toLowerCase();
+    const rows = document.querySelectorAll('#products-table tbody tr');
+    rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}
+{% block page_breadcrumb %}Products
+<script>
+function adminFilterProducts() {
+    const q = (document.getElementById('admin-search-input')?.value || '').toLowerCase();
+    const rows = document.querySelectorAll('#products-table tbody tr');
+    rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}
 
 {% block content %}
 <div class="card">
     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
         <h3 class="card-title"><i class="fas fa-box-open"></i> All Products</h3>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <div style="position: relative; display: flex; align-items: center;">
+                <input type="text" id="admin-search-input" placeholder="Search products..." style="padding: 0.45rem 0.75rem 0.45rem 2rem; border-radius: 8px; border: 1px solid var(--border-color, #cbd5e1); background: var(--bg-darkest, #0b0f19); color: var(--text-primary, #ffffff); font-size: 0.85rem;" onkeyup="adminFilterProducts()">
+                <i class="fas fa-search" style="position: absolute; left: 0.75rem; color: #94a3b8; font-size: 0.8rem;"></i>
+            </div>
+            <button type="button" onclick="adminFilterProducts()" class="btn" style="background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); font-weight: 600; padding: 0.45rem 0.85rem; font-size: 0.85rem; cursor: pointer;" title="Search">
+                <i class="fas fa-search"></i> Search
+            </button>
             <a href="/api/products" target="_blank" class="btn" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-weight: 500;">
                 <i class="fas fa-code"></i> Products API (JSON)
             </a>
@@ -84,4 +135,15 @@
         </div>
     </div>
 </div>
+
+<script>
+function adminFilterProducts() {
+    const q = (document.getElementById('admin-search-input')?.value || '').toLowerCase();
+    const rows = document.querySelectorAll('#products-table tbody tr');
+    rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+    });
+}
+</script>
 {% endblock %}
